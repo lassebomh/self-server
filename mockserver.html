@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+    <script type="module">
+        import { register } from './selfserver.js';
+        // import { Router } from 'https://www.unpkg.com/tiny-request-router@1.2.2/dist/router.browser.mjs'
+    
+        // const router = new Router()
+    
+        // router
+        //     .get('/(v1|v2)/:age/:name', 'foo1')
+        //     .get('/info/(.*)/export', 'foo2')
+        //     .post('/upload/user', 'foo3')
+    
+        // const match1 = router.match('GET', '/v1/')
+        // console.log(match1);
+    
+        // const match2 = router.match('GET', '/v1/bob/22')
+        // console.log(match2);
+    
+        let counter = 0;
+        
+        function handleRequest(request) {
+    
+            const url = new URL(request.url);
+
+            if (url.pathname == '/fetch') {
+                counter++;
+    
+                return new Response(counter.toString(), {
+                    status: 200,
+                    statusText: 'OK',
+                    headers: {'Content-Type': 'text/html'}
+                });
+            } else if (url.pathname == '/') {
+                return new Response(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>API Mocking Example<\/title>
+                        <script src="https:\/\/unpkg.com\/htmx.org@1.9.10"><\/script>
+                    <\/head>
+                    <body>
+                        <button hx-get="\/fetch" hx-swap="innerHTML">
+                            Fetch
+                        <\/button>
+                    <\/body>
+                    <\/html>
+                    `,
+                    {
+                        status: 200,
+                        statusText: 'OK',
+                        headers: {'Content-Type': 'text/html'}
+                    }
+                );
+            }
+    
+            return new Response(null, {
+                status: 404,
+                statusText: 'Not Found'
+            });
+        }
+    
+        register(handleRequest);
+    </script>
+</html>
