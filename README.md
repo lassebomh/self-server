@@ -2,7 +2,7 @@
 
 ![Self Server](./important.jpg)
 
-This repository turns a tab into a mock server, that can handle requests coming from its own domain.
+This repository creates two iframes on the same origin (within a different origin), and uses them to mock a server and a client.
 
 For example:
 
