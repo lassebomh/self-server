@@ -1,65 +1,83 @@
 <!DOCTYPE html>
 <html>
-    <script type="module">
-        import { register } from './selfserver.js';
-        // import { Router } from 'https://www.unpkg.com/tiny-request-router@1.2.2/dist/router.browser.mjs'
-    
-        // const router = new Router()
-    
-        // router
-        //     .get('/(v1|v2)/:age/:name', 'foo1')
-        //     .get('/info/(.*)/export', 'foo2')
-        //     .post('/upload/user', 'foo3')
-    
-        // const match1 = router.match('GET', '/v1/')
-        // console.log(match1);
-    
-        // const match2 = router.match('GET', '/v1/bob/22')
-        // console.log(match2);
-    
-        let counter = 0;
+    <body>
         
-        function handleRequest(request) {
-    
-            const url = new URL(request.url);
+        <script type="module">
+            import mime from 'https://esm.sh/mime@4.0.1/lite';
 
-            if (url.pathname == '/fetch') {
-                counter++;
-    
-                return new Response(counter.toString(), {
-                    status: 200,
-                    statusText: 'OK',
-                    headers: {'Content-Type': 'text/html'}
+            let files;
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/serviceworker.js').then(() => {
+                    console.log('Service Worker registered');
+                    
+                    window.parent.postMessage({type: "init", ok: true}, '*')
+                    
+                    window.addEventListener('message', (e) => {
+                        if (window.parent !== e.source) return
+                    
+                        console.log('iframe got message', e);
+
+                        if (e.data.type == 'init') {
+                            files = e.data.value;
+
+                            let script = document.createElement('script')
+                            script.type = 'module'
+                            script.innerHTML = files['/server.js']
+                            document.body.appendChild(script)
+                        }
+
+                        navigator.serviceWorker.onmessage = async (event) => {
+
+                            let response;
+
+                            console.log('mock server event data', event.data);
+
+                            if (event.data.self) {
+                                console.log('is server', event.data.request);
+                                let url = new URL(event.data.request.url)
+
+                                let fileContents = files[url.pathname]
+
+                                console.log(url.pathname);
+                                console.log(fileContents);
+
+                                if (fileContents !== undefined) {
+                                    response = new Response(fileContents, {
+                                        status: 200,
+                                        headers: {
+                                            'Content-Type': mime.getType(url.pathname),
+                                        }
+                                    })
+                                } else {
+                                    response = new Response(null, {status: 404});
+                                }
+
+                            } else {
+                                response = await window.requestHandler(event.data.request);
+                            }
+
+                            const clonedResponse = response.clone();
+                            const body = await clonedResponse.blob();
+                            const headers = Object.fromEntries(response.headers.entries());
+
+                            const serializedResponse = {
+                                body: body,
+                                status: response.status,
+                                statusText: response.statusText,
+                                headers: headers
+                            };
+
+                            event.ports[0].postMessage({ id: event.data.id, response: serializedResponse });
+                        };
+
+                    })
+
+                }).catch(error => {
+                    console.error('Service Worker registration failed:', error);
+                    window.parent.postMessage({type: "init", ok: false}, '*')
                 });
-            } else if (url.pathname == '/') {
-                return new Response(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>API Mocking Example<\/title>
-                        <script src="https:\/\/unpkg.com\/htmx.org@1.9.10"><\/script>
-                    <\/head>
-                    <body>
-                        <button hx-get="\/fetch" hx-swap="innerHTML">
-                            Fetch
-                        <\/button>
-                    <\/body>
-                    <\/html>
-                    `,
-                    {
-                        status: 200,
-                        statusText: 'OK',
-                        headers: {'Content-Type': 'text/html'}
-                    }
-                );
             }
-    
-            return new Response(null, {
-                status: 404,
-                statusText: 'Not Found'
-            });
-        }
-    
-        register(handleRequest);
-    </script>
+        </script>
+    </body>
 </html>

@@ -1,13 +1,14 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>API Mocking Example</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playground</title>
+    <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-    <button hx-get="/fetch" hx-swap="innerHTML">
-        Fetch
-    </button>
+    <div id="sandbox-server-container"></div>
+    <div id="sandbox-container"></div>
+    <script src="start.js"></script>
 </body>
 </html>

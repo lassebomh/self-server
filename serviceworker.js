@@ -1,6 +1,4 @@
 
-let messageId = 0;
-
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
@@ -9,38 +7,56 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(self.clients.claim());
 });
 
+function urlIsMockServer(url) {
+    if (!(url instanceof URL)) {
+        url = new URL(url);
+    }
+    return url.pathname == '/mockserver.html'
+}
+
 self.addEventListener('fetch', (event) => {
     
-    const id = messageId++;
+    const id = event.clientId + Math.floor(Math.random() * 100000000);
     const messageChannel = new MessageChannel();
 
     const requestUrl = new URL(event.request.url);
 
-    console.log('sw got request', event.request);
-
     if (requestUrl.origin != self.location.origin) return
 
-    if (requestUrl.origin == self.location.origin) {
-        if (requestUrl.pathname == '/mockserver.html') return
-        
-        if (event.request.referrer != "") {
-            const referrerUrl = new URL(event.request.referrer);
-            if (referrerUrl.pathname == '/mockserver.html') return
-        }
-    }
-    
     event.respondWith(new Promise(async (resolve, reject) => {
+
+        let client;
+        let server;
+
+        const allClients = await clients.matchAll({includeUncontrolled: true});
+
+        for (const c of allClients) {
+            if (urlIsMockServer(c.url)) {
+                server = c;
+                if (client != null) break
+            }
+            if (c.id == event.clientId) {
+                client = c
+                if (server != null) break
+            }
+        }
+
+        if (
+            server == null                               // Pass requests if no mock servers are open
+            || (!client && urlIsMockServer(requestUrl))) // Pass requests from starting mock servers
+        {
+            resolve(fetch(event.request))
+            return
+        }
+
         messageChannel.port1.onmessage = (responseEvent) => {
+
+            console.log('got response!!', responseEvent.data);
 
             const responseId = responseEvent.data.id;
             const response = responseEvent.data.response;
             
-            if (responseId !== id) {
-                console.warn('sw got WRONG response from client');
-                return
-            };
-
-            console.log('sw got response', response);
+            if (responseId !== id) return;
 
             const newResponse = new Response(response.body, {
                 status: response.status,
@@ -48,37 +64,19 @@ self.addEventListener('fetch', (event) => {
                 headers: response.headers
             });
 
-            console.log('sw responding to', responseId);
-
             resolve(newResponse);
         };
 
         const serializedRequest = {
             id: id,
+            self: (client != null && urlIsMockServer(client.url)),
             request: {
                 url: event.request.url,
                 method: event.request.method,
                 headers: Object.fromEntries(event.request.headers.entries()),
             }
         };
-
-        const allClients = await clients.matchAll({includeUncontrolled: true});
-
-        console.log(allClients);
-
-        let mockServer;
-
-        for (const client of allClients) {
-            const url = new URL(client.url);
-
-            if (url.pathname === "/mockserver.html") {
-                mockServer = client;
-                break
-            }
-        }
-
-        console.log(mockServer);
         
-        mockServer.postMessage(serializedRequest, [messageChannel.port2]);
+        server.postMessage(serializedRequest, [messageChannel.port2]);
     }));
 });
