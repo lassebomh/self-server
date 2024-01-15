@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            html, body {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+            
+            iframe {
+                width: 100%;
+                height: 100%;
+                border: none;
+            }
+        </style>
+        <script src="https://cdn.jsdelivr.net/npm/nunjucks@3.2.4/browser/nunjucks.min.js"></script>
+        <script type="module">
+            import mime from 'https://esm.sh/mime@4.0.1/lite';
+
+            window.mime = mime;
+
+            async function handleServiceWorkerRequest(event) {
+                let response;
+
+                if (event.data.self) {
+                    let url = new URL(event.data.request.url)
+                    let fileContents = window.files[url.pathname]
+
+                    if (fileContents !== undefined) {
+                        response = new Response(fileContents, {
+                            status: 200,
+                            headers: {
+                                'Content-Type': mime.getType(url.pathname),
+                            }
+                        })
+                    } else {
+                        response = new Response(null, {status: 404});
+                    }
+
+                } else {
+                    response = await window.requestHandler(event.data.request);
+                }
+
+                const clonedResponse = response.clone();
+                const body = await clonedResponse.blob();
+                const headers = Object.fromEntries(response.headers.entries());
+
+                const serializedResponse = {
+                    body: body,
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: headers
+                };
+
+                event.ports[0].postMessage({ id: event.data.id, response: serializedResponse });
+            }
+
+            function createClientIframe(event) {
+                let playgroundIframe = document.createElement('iframe')
+                playgroundIframe.src = "/"
+
+                playgroundIframe.addEventListener('load', () => {
+                    var iframeDocument = playgroundIframe.contentDocument || playgroundIframe.contentWindow.document;
+
+                    var observer = new MutationObserver(function(mutationsList, observer) {
+                        for (var mutation of mutationsList) {
+                            console.log(mutation);
+                        }
+                    });
+
+                    observer.observe(iframeDocument.documentElement, {
+                        attributes: true,
+                        childList: true,
+                        subtree: true
+                    });
+                });
+
+                document.body.appendChild(playgroundIframe)
+            }
+
+            function handleParentMessage(event) {
+                if (window.parent !== event.source) return
+            
+                if (event.data.type == 'fetch-files') {
+                    window.files = event.data.value;
+
+                    let script = document.createElement('script')
+                    script.type = 'module'
+                    script.src = '/server.js'
+
+                    script.addEventListener('load', createClientIframe)
+
+                    document.body.appendChild(script)
+                }
+
+                navigator.serviceWorker.addEventListener('message', handleServiceWorkerRequest);
+
+            }
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/_sw_v1.js').then(async () => {
+                    console.log('Service Worker registered');
+                    
+                    window.addEventListener('message', handleParentMessage)
+                    window.parent.postMessage({type: "fetch-files"}, '*')
+
+                }).catch(error => {
+                    console.error('Service Worker registration failed:', error);
+                });
+            }
+
+            window.beforeunload = async () => {
+                if ('serviceWorker' in navigator) {
+                    let registrations = await navigator.serviceWorker.getRegistrations();
+                    
+                    for (let registration of registrations) {
+                        console.log("Unregistered", registration);
+                        registration.unregister();
+                    }
+                }
+            };
+        </script>
+    </head>
+    <body>
+    </body>
+</html>

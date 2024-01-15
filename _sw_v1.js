@@ -12,7 +12,7 @@ function urlIsMockServer(url) {
     if (!(url instanceof URL)) {
         url = new URL(url);
     }
-    return url.pathname == '/mockserver.html'
+    return url.pathname == '/_init.html'
 }
 
 self.addEventListener('fetch', (event) => {
