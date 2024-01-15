@@ -11,13 +11,9 @@
                 navigator.serviceWorker.register('/serviceworker.js').then(() => {
                     console.log('Service Worker registered');
                     
-                    window.parent.postMessage({type: "init", ok: true}, '*')
-                    
                     window.addEventListener('message', (e) => {
                         if (window.parent !== e.source) return
                     
-                        console.log('iframe got message', e);
-
                         if (e.data.type == 'init') {
                             files = e.data.value;
 
@@ -31,16 +27,10 @@
 
                             let response;
 
-                            console.log('mock server event data', event.data);
-
                             if (event.data.self) {
-                                console.log('is server', event.data.request);
                                 let url = new URL(event.data.request.url)
 
                                 let fileContents = files[url.pathname]
-
-                                console.log(url.pathname);
-                                console.log(fileContents);
 
                                 if (fileContents !== undefined) {
                                     response = new Response(fileContents, {
@@ -73,11 +63,24 @@
 
                     })
 
+                    window.parent.postMessage({type: "init", ok: true}, '*')
+
                 }).catch(error => {
                     console.error('Service Worker registration failed:', error);
                     window.parent.postMessage({type: "init", ok: false}, '*')
                 });
             }
+
+            window.beforeunload = async () => {
+                if ('serviceWorker' in navigator) {
+                    let registrations = await navigator.serviceWorker.getRegistrations();
+                    
+                    for (let registration of registrations) {
+                        console.log("Unregistered", registration);
+                        registration.unregister();
+                    }
+                }
+            };
         </script>
     </body>
 </html>

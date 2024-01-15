@@ -5,6 +5,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
     event.waitUntil(self.clients.claim());
+    console.log('activated');
 });
 
 function urlIsMockServer(url) {
@@ -21,7 +22,9 @@ self.addEventListener('fetch', (event) => {
 
     const requestUrl = new URL(event.request.url);
 
-    if (requestUrl.origin != self.location.origin) return
+    if (requestUrl.origin != self.location.origin) {
+        return;
+    }
 
     event.respondWith(new Promise(async (resolve, reject) => {
 
@@ -41,17 +44,16 @@ self.addEventListener('fetch', (event) => {
             }
         }
 
-        if (
-            server == null                               // Pass requests if no mock servers are open
-            || (!client && urlIsMockServer(requestUrl))) // Pass requests from starting mock servers
+        if (!client && urlIsMockServer(requestUrl)) // Pass requests from starting mock servers
         {
             resolve(fetch(event.request))
             return
         }
 
-        messageChannel.port1.onmessage = (responseEvent) => {
+        // console.log('client', client && client.id);
+        // console.log('server', server && client.id);
 
-            console.log('got response!!', responseEvent.data);
+        messageChannel.port1.onmessage = (responseEvent) => {
 
             const responseId = responseEvent.data.id;
             const response = responseEvent.data.response;
